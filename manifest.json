@@ -1,0 +1,21 @@
+{
+  "name": "Feed Personalizado Google News",
+  "short_name": "Feed Noticias",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#121212",
+  "theme_color": "#2ecc71",
+  "description": "Generador y visualizador de RSS de Google News con proxy Cloudflare",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
