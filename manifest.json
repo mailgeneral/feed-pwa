@@ -1,7 +1,7 @@
 {
   "name": "Feed Personalizado Google News",
   "short_name": "Feed Noticias",
-  "start_url": "./index.html",
+  "start_url": "/feed-pwa/",
   "display": "standalone",
   "background_color": "#121212",
   "theme_color": "#2ecc71",
