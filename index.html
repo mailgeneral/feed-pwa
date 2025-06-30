@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Generador y Visualizador RSS Google News - PWA</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#2ecc71" />
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 2rem;
+      background: #121212;
+      color: #eee;
+      transition: background 0.3s, color 0.3s;
+    }
+    body.neon {
+      background: #0f0f0f;
+      color: #39ff14;
+    }
+    label {
+      display: block;
+      margin-top: 1rem;
+    }
+    input,
+    select {
+      width: 100%;
+      padding: 0.5rem;
+      background: #1e1e1e;
+      color: #eee;
+      border: 1px solid #555;
+      border-radius: 5px;
+    }
+    button {
+      margin-top: 1rem;
+      padding: 0.75rem;
+      background: #2ecc71;
+      color: #000;
+      font-weight: bold;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    #output,
+    #rssFeed {
+      margin-top: 2rem;
+    }
+    #rssFeed {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.5rem;
+    }
+    .card {
+      background: #1e1e1e;
+      border-radius: 10px;
+      padding: 1rem;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      height: 100%;
+    }
+    .card img {
+      width: 100%;
+      max-height: 180px;
+      object-fit: cover;
+      border-radius: 8px;
+      margin-bottom: 0.8rem;
+    }
+    .card h3 {
+      color: #2ecc71;
+      font-size: 1.1rem;
+      margin: 0 0 0.5rem 0;
+    }
+    .card p {
+      color: #ccc;
+      flex-grow: 1;
+    }
+    .card a {
+      display: inline-block;
+      margin-top: 0.8rem;
+      background: #2ecc71;
+      color: #000;
+      padding: 0.4rem 0.8rem;
+      text-decoration: none;
+      font-weight: bold;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎯 Generador y Visualizador de RSS Google News</h1>
+
+  <label for="keywords">🔍 Palabras clave o frase:</label>
+  <input type="text" id="keywords" placeholder="Ej: eventos gratis puebla" />
+
+  <label for="lang">🌐 Idioma (`hl`):</label>
+  <select id="lang">
+    <option value="es-419">Español LATAM</option>
+    <option value="es">Español</option>
+    <option value="en">Inglés</option>
+    <option value="pt-BR">Portugués Brasil</option>
+  </select>
+
+  <label for="country">🏳️ País (`gl`):</label>
+  <select id="country">
+    <option value="MX">México</option>
+    <option value="AR">Argentina</option>
+    <option value="US">USA</option>
+    <option value="ES">España</option>
+    <option value="BR">Brasil</option>
+  </select>
+
+  <button onclick="generateAndLoad()">🎯 Generar y Cargar Feed</button>
+  <button onclick="copyURL()">📋 Copiar URL</button>
+  <button onclick="saveFeed()">💾 Guardar Feed</button>
+  <button onclick="toggleTheme()">🌈 Alternar Modo Neón</button>
+
+  <div id="output"></div>
+  <div id="savedFeeds"></div>
+
+  <input
+    type="text"
+    id="searchBox"
+    placeholder="🔎 Buscar en resultados..."
+    oninput="filterResults()"
+  />
+  <button onclick="exportJSON()">⬇️ Exportar JSON</button>
+  <button onclick="exportCSV()">⬇️ Exportar CSV</button>
+
+  <div id="rssFeed"></div>
+
+  <script>
+    let currentRSS = "";
+    let lastItems = [];
+
+    function encodeQuery(query) {
+      return encodeURIComponent(query.trim().replace(/\s+/g, "+"));
+    }
+
+    async function generateAndLoad() {
+      const keywords = document.getElementById("keywords").value.trim();
+      const lang = document.getElementById("lang").value;
+      const country = document.getElementById("country").value;
+
+      if (!keywords) return alert("❌ Faltan palabras clave.");
+
+      const encodedQuery = encodeQuery(keywords);
+      const ceid = `${country}:${lang}`;
+      currentRSS = `https://news.google.com/rss/search?q=${encodedQuery}&hl=${lang}&gl=${country}&ceid=${ceid}`;
+
+      document.getElementById("output").innerHTML = `✅ <a href="${currentRSS}" target="_blank">${currentRSS}</a>`;
+
+      await loadFeed();
+    }
+
+    function copyURL() {
+      if (!currentRSS) return alert("Nada para copiar.");
+      navigator.clipboard.writeText(currentRSS);
+      alert("URL copiada al portapapeles.");
+    }
+
+    function saveFeed() {
+      if (!currentRSS) return;
+      const feeds = JSON.parse(localStorage.getItem("feeds") || "[]");
+      if (!feeds.includes(currentRSS)) feeds.push(currentRSS);
+      localStorage.setItem("feeds", JSON.stringify(feeds));
+      renderSavedFeeds();
+    }
+
+    function renderSavedFeeds() {
+      const feeds = JSON.parse(localStorage.getItem("feeds") || "[]");
+      const container = document.getElementById("savedFeeds");
+      container.innerHTML = "<h3>🗂 Feeds guardados:</h3>";
+      feeds.forEach((url) => {
+        const btn = document.createElement("button");
+        btn.textContent = url;
+        btn.style.margin = "0.25rem 0";
+        btn.onclick = () => {
+          currentRSS = url;
+          loadFeed();
+        };
+        container.appendChild(btn);
+      });
+    }
+
+    function toggleTheme() {
+      document.body.classList.toggle("neon");
+    }
+
+    async function loadFeed() {
+      if (!currentRSS) return alert("Generá o seleccioná un RSS.");
+      try {
+        const proxyUrl = `https://feed-personalizado-noticias.corporativoimperdellanta.workers.dev/?url=${encodeURIComponent(
+          currentRSS
+        )}`;
+        const res = await fetch(proxyUrl);
+        const xmlText = await res.text();
+        const parser = new DOMParser();
+        const xml = parser.parseFromString(xmlText, "text/xml");
+        const items = Array.from(xml.querySelectorAll("item"));
+        lastItems = items.map((item) => ({
+          title: item.querySelector("title")?.textContent || "",
+          link: item.querySelector("link")?.textContent || "",
+          description: item.querySelector("description")?.textContent || "",
+        }));
+        renderItems(lastItems);
+      } catch (err) {
+        document.getElementById("rssFeed").innerHTML = "❌ Error al cargar feed.";
+      }
+    }
+
+    function renderItems(items) {
+      const container = document.getElementById("rssFeed");
+      container.innerHTML = "";
+      items.forEach(({ title, link, description }) => {
+        const imageMatch = description.match(/<img[^>]+src=\"([^\">]+)\"/);
+        const imageUrl = imageMatch ? imageMatch[1] : "";
+        const cleanText = description.replace(/<[^>]*>?/gm, "").substring(0, 300);
+
+        const card = document.createElement("div");
+        card.classList.add("card");
+
+        if (imageUrl) {
+          const img = document.createElement("img");
+          img.src = imageUrl;
+          card.appendChild(img);
+        }
+
+        const h3 = document.createElement("h3");
+        h3.textContent = title;
+        card.appendChild(h3);
+
+        const p = document.createElement("p");
+        p.textContent = cleanText + "...";
+        card.appendChild(p);
+
+        const a = document.createElement("a");
+        a.href = link;
+        a.target = "_blank";
+        a.textContent = "Leer más";
+        card.appendChild(a);
+
+        container.appendChild(card);
+      });
+    }
+
+    function filterResults() {
+      const q = document.getElementById("searchBox").value.toLowerCase();
+      const filtered = lastItems.filter(
+        (item) =>
+          item.title.toLowerCase().includes(q) ||
+          item.description.toLowerCase().includes(q)
+      );
+      renderItems(filtered);
+    }
+
+    function exportJSON() {
+      const blob = new Blob([JSON.stringify(lastItems, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "feed.json";
+      a.click();
+    }
+
+    function exportCSV() {
+      const rows = ["title,link,description"];
+      lastItems.forEach(({ title, link, description }) => {
+        const clean = description.replace(/<[^>]*>?/gm, "").replace(/"/g, '""');
+        rows.push(`"${title}","${link}","${clean}"`);
+      });
+      const csv = rows.join("\n");
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "feed.csv";
+      a.click();
+    }
+
+    window.onload = () => {
+      renderSavedFeeds();
+    };
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('service-worker.js')
+          .then(reg => console.log('Service Worker registrado.', reg))
+          .catch(err => console.error('Error registrando SW:', err));
+      });
+    }
+  </script>
+</body>
+</html>
